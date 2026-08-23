@@ -4,51 +4,80 @@ services:
     image: postgres:16
     container_name: creditiq-db
     restart: unless-stopped
+
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: creditiq
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # PostgreSQL is intentionally NOT exposed to the host.
+    # API and other services access it internally through:
+    # db:5432
+
 
   api:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
+
     container_name: creditiq-api
     restart: unless-stopped
+
     environment:
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: creditiq
+      DB_NAME: ${DB_NAME}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+
     ports:
       - "8000:8000"
+
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
 
   dashboard:
     build:
       context: .
       dockerfile: docker/Dockerfile.dashboard
+
     container_name: creditiq-dashboard
     restart: unless-stopped
+
     environment:
       API_URL: http://api:8000
+
     ports:
       - "8501:8501"
+
     depends_on:
-      - api
+      api:
+        condition: service_started
+
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.17.2
     container_name: creditiq-mlflow
     restart: unless-stopped
+
     ports:
       - "5000:5000"
+
+    volumes:
+      - mlflow_data:/mlruns
+
     command:
       - mlflow
       - server
@@ -56,6 +85,12 @@ services:
       - 0.0.0.0
       - --port
       - "5000"
+      - --backend-store-uri
+      - sqlite:///mlruns/mlflow.db
+      - --default-artifact-root
+      - /mlruns
+
 
 volumes:
   postgres_data:
+  mlflow_data:
