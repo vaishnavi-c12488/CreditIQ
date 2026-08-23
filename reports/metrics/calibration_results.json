@@ -1,0 +1,16 @@
+{
+    "before_calibration": {
+        "roc_auc": 0.7630334389423651,
+        "pr_auc": 0.2747161323259628,
+        "ks": 0.3882963790090848,
+        "calibration_error": 0.3623820681271073
+    },
+    "after_platt_scaling": {
+        "roc_auc": 0.7630334389423651,
+        "pr_auc": 0.2747161323259628,
+        "ks": 0.3882963790090848,
+        "calibration_error": 0.0038725246622321437
+    },
+    "calibration_method": "Platt scaling",
+    "calibration_improved": true
+}

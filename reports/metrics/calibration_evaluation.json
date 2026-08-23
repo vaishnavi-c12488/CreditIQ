@@ -1,0 +1,8 @@
+{
+    "roc_auc": 0.7642549672769643,
+    "pr_auc": 0.27225206487033465,
+    "ks_statistic": 0.39212538953430637,
+    "calibration_error": 0.3428930189382305,
+    "calibration_status": "MISALIBRATED",
+    "recommended_action": "Apply Platt scaling and re-evaluate."
+}

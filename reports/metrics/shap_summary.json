@@ -1,0 +1,92 @@
+{
+    "model": "Monotonic XGBoost",
+    "dataset": "validation_final.parquet",
+    "dataset_role": "validation explainability only",
+    "shap_sample_size": 5000,
+    "selected_features": 80,
+    "top_features": [
+        {
+            "feature": "EXT_SOURCE_2",
+            "mean_abs_shap": 0.3358110785484314
+        },
+        {
+            "feature": "EXT_SOURCE_3",
+            "mean_abs_shap": 0.3113728165626526
+        },
+        {
+            "feature": "EXT_SOURCE_1",
+            "mean_abs_shap": 0.17178845405578613
+        },
+        {
+            "feature": "installment_ontime_ratio",
+            "mean_abs_shap": 0.13902254402637482
+        },
+        {
+            "feature": "previous_avg_credit_to_application_ratio",
+            "mean_abs_shap": 0.13582715392112732
+        },
+        {
+            "feature": "ANNUITY_TO_CREDIT",
+            "mean_abs_shap": 0.1205541118979454
+        },
+        {
+            "feature": "AMT_GOODS_PRICE",
+            "mean_abs_shap": 0.10958646237850189
+        },
+        {
+            "feature": "CODE_GENDER",
+            "mean_abs_shap": 0.10875894874334335
+        },
+        {
+            "feature": "OWN_CAR_AGE",
+            "mean_abs_shap": 0.09271765500307083
+        },
+        {
+            "feature": "NAME_EDUCATION_TYPE",
+            "mean_abs_shap": 0.08171528577804565
+        },
+        {
+            "feature": "OCCUPATION_TYPE",
+            "mean_abs_shap": 0.07470924407243729
+        },
+        {
+            "feature": "ORGANIZATION_TYPE",
+            "mean_abs_shap": 0.07300704717636108
+        },
+        {
+            "feature": "YEARS_EMPLOYED",
+            "mean_abs_shap": 0.07227344810962677
+        },
+        {
+            "feature": "NAME_CONTRACT_TYPE",
+            "mean_abs_shap": 0.06658151000738144
+        },
+        {
+            "feature": "CREDIT_UTILIZATION",
+            "mean_abs_shap": 0.06461003422737122
+        },
+        {
+            "feature": "bureau_most_recent_days",
+            "mean_abs_shap": 0.05515041947364807
+        },
+        {
+            "feature": "installment_total_paid",
+            "mean_abs_shap": 0.05210675671696663
+        },
+        {
+            "feature": "AMT_ANNUITY",
+            "mean_abs_shap": 0.04852743074297905
+        },
+        {
+            "feature": "DAYS_EMPLOYED",
+            "mean_abs_shap": 0.04588048905134201
+        },
+        {
+            "feature": "installment_avg_paid",
+            "mean_abs_shap": 0.04431435838341713
+        }
+    ],
+    "test_set_used": false,
+    "model_retrained": false,
+    "threshold_tuned": false
+}

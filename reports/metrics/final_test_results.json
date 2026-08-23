@@ -1,0 +1,30 @@
+{
+    "model": "Monotonic XGBoost",
+    "calibration": "Platt scaling",
+    "threshold_source": "configs/threshold.yaml",
+    "threshold_selection_data": "validation",
+    "test_data_usage": "final evaluation only",
+    "test_rows": 46127,
+    "test_features": 80,
+    "threshold": 0.2,
+    "metrics": {
+        "roc_auc": 0.7629995490069802,
+        "pr_auc": 0.2825646109911274,
+        "ks": 0.3941806124967754,
+        "calibration_error": 0.009630040736390785,
+        "threshold": 0.2,
+        "accuracy": 0.8573937173455893,
+        "precision": 0.3137755102040816,
+        "recall": 0.3416666666666667,
+        "f1": 0.3271276595744681,
+        "false_positive_rate": 0.08437281347262769,
+        "true_positive_rate": 0.3416666666666667,
+        "threshold_ks": 0.25729385319403897,
+        "approval_rate": 0.8895224055325515,
+        "decline_rate": 0.11047759446744856,
+        "true_negatives": 37950,
+        "false_positives": 3497,
+        "false_negatives": 3081,
+        "true_positives": 1599
+    }
+}

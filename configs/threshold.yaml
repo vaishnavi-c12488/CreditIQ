@@ -1,0 +1,20 @@
+# CreditIQ Decision Policy
+# Threshold selected using validation data only.
+# Test data remains untouched.
+
+decision_threshold: 0.20
+
+selection_basis:
+  target: approximately_10_percent_false_positive_rate
+  validation_threshold: 0.20
+  validation_fpr: 0.0912
+  validation_recall: 0.3767
+  validation_precision: 0.2998
+  validation_f1: 0.3339
+  validation_approval_rate: 0.8820
+
+notes:
+  - Threshold was selected after validation threshold analysis.
+  - Test data was not used for threshold selection.
+  - Accuracy is not the headline selection metric.
+  - Final test evaluation must use this frozen threshold.

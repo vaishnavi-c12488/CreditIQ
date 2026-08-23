@@ -1,0 +1,95 @@
+{
+    "model": "Monotonic XGBoost",
+    "calibration": "Platt scaling",
+    "evaluation_dataset": "validation",
+    "test_set_used": false,
+    "decision_threshold": 0.2,
+    "age_proxy": {
+        "source": "DAYS_BIRTH",
+        "groups": [
+            "<25",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55+"
+        ],
+        "group_counts": {
+            "<25": 6479,
+            "25-34": 12378,
+            "35-44": 5949,
+            "45-54": 19062,
+            "55+": 2259
+        }
+    },
+    "threshold_independent_model_metrics": {
+        "roc_auc": 0.764754917734265,
+        "pr_auc": 0.27137400523789634
+    },
+    "before_mitigation": {
+        "fairness": {
+            "demographic_parity_difference": 0.20361366353966404,
+            "equalized_odds_difference": 0.3786863722057635
+        },
+        "decision_metrics": {
+            "accuracy": 0.8584126433542177,
+            "precision": 0.29725244329706807,
+            "recall": 0.3721144967682364,
+            "f1": 0.33049718093285496
+        },
+        "operating_metrics": {
+            "false_positive_rate": 0.09118315587988994,
+            "true_positive_rate": 0.3721144967682364,
+            "approval_rate": 0.8824332820257116,
+            "decline_rate": 0.11756671797428841,
+            "true_negatives": 37984,
+            "false_positives": 3811,
+            "false_negatives": 2720,
+            "true_positives": 1612,
+            "total": 46127
+        },
+        "selection_rates": {
+            "<25": 0.75875906775737,
+            "25-34": 0.8380998545807077,
+            "35-44": 0.8920827029752899,
+            "45-54": 0.940772216976183,
+            "55+": 0.962372731297034
+        }
+    },
+    "after_mitigation": {
+        "fairness": {
+            "demographic_parity_difference": 0.01781916537564232,
+            "equalized_odds_difference": 0.0220098993833171
+        },
+        "decision_metrics": {
+            "accuracy": 0.7142020942181369,
+            "precision": 0.19260957143849414,
+            "recall": 0.6401200369344414,
+            "f1": 0.29611831918415293
+        },
+        "operating_metrics": {
+            "false_positive_rate": 0.2781193922718028,
+            "true_positive_rate": 0.6401200369344414,
+            "approval_rate": 0.6878834522080344,
+            "decline_rate": 0.3121165477919656,
+            "true_negatives": 30171,
+            "false_positives": 11624,
+            "false_negatives": 1559,
+            "true_positives": 2773,
+            "total": 46127
+        },
+        "selection_rates": {
+            "<25": 0.6791171477079796,
+            "25-34": 0.6805622879301988,
+            "35-44": 0.680786686838124,
+            "45-54": 0.6969363130836219,
+            "55+": 0.6954404603806994
+        }
+    },
+    "mitigation": {
+        "method": "Fairlearn ThresholdOptimizer",
+        "constraint": "equalized_odds",
+        "objective": "balanced_accuracy_score"
+    },
+    "primary_fairness_metric": "equalized_odds_difference",
+    "limitations": "DAYS_BIRTH-derived age group is a proxy attribute and does not establish complete legal or ethical fairness."
+}

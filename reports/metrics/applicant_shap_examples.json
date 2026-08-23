@@ -1,0 +1,218 @@
+{
+    "model": "Monotonic XGBoost",
+    "threshold": 0.2,
+    "feature_count": 80,
+    "test_set_used": false,
+    "examples": [
+        {
+            "applicant_id": 447009,
+            "predicted_probability": 0.03462325409054756,
+            "decision_threshold": 0.2,
+            "decision": "APPROVE",
+            "top_risk_increasing_factors": [
+                {
+                    "feature": "installment_ontime_ratio",
+                    "value": -0.20787275994952184,
+                    "shap_value": 0.17819704115390778,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "ANNUITY_TO_CREDIT",
+                    "value": -0.17504052359836625,
+                    "shap_value": 0.05831753835082054,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "AMT_ANNUITY",
+                    "value": -0.2348265292992372,
+                    "shap_value": 0.03373352438211441,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "AMT_GOODS_PRICE",
+                    "value": -0.093741998317471,
+                    "shap_value": 0.029853425920009613,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "pos_cash_active_count",
+                    "value": -0.2027495281736855,
+                    "shap_value": 0.028270645067095757,
+                    "direction": "increases_risk"
+                }
+            ],
+            "top_risk_reducing_factors": [
+                {
+                    "feature": "NAME_CONTRACT_TYPE",
+                    "value": 0.5364987555455729,
+                    "shap_value": -0.721429169178009,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "EXT_SOURCE_2",
+                    "value": 1.0408564967390914,
+                    "shap_value": -0.7052460312843323,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "EXT_SOURCE_3",
+                    "value": 0.420888023673515,
+                    "shap_value": -0.3756157457828522,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "OWN_CAR_AGE",
+                    "value": 0.43306254094490876,
+                    "shap_value": -0.24643853306770325,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "REGION_POPULATION_RELATIVE",
+                    "value": 0.6455986508810273,
+                    "shap_value": -0.20281530916690826,
+                    "direction": "decreases_risk"
+                }
+            ]
+        },
+        {
+            "applicant_id": 341732,
+            "predicted_probability": 0.27701449394226074,
+            "decision_threshold": 0.2,
+            "decision": "DECLINE",
+            "top_risk_increasing_factors": [
+                {
+                    "feature": "installment_ontime_ratio",
+                    "value": -0.5178286278966896,
+                    "shap_value": 0.2856743335723877,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "YEARS_EMPLOYED",
+                    "value": -0.42113787822114357,
+                    "shap_value": 0.08976778388023376,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "installment_avg_paid",
+                    "value": 0.1512075846992586,
+                    "shap_value": 0.0774112343788147,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "installment_payment_ratio",
+                    "value": -0.46906267212904706,
+                    "shap_value": 0.07626313716173172,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "OCCUPATION_TYPE",
+                    "value": -0.30051874387415367,
+                    "shap_value": 0.07162254303693771,
+                    "direction": "increases_risk"
+                }
+            ],
+            "top_risk_reducing_factors": [
+                {
+                    "feature": "EXT_SOURCE_2",
+                    "value": 0.695759736238243,
+                    "shap_value": -0.5105372071266174,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "EXT_SOURCE_1",
+                    "value": 0.6094742178306439,
+                    "shap_value": -0.4969117343425751,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "EXT_SOURCE_3",
+                    "value": 0.2963010035111026,
+                    "shap_value": -0.2660878896713257,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "previous_avg_credit_to_application_ratio",
+                    "value": 0.225921138433336,
+                    "shap_value": -0.18870455026626587,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "AMT_GOODS_PRICE",
+                    "value": 0.1953756715432066,
+                    "shap_value": -0.11903587728738785,
+                    "direction": "decreases_risk"
+                }
+            ]
+        },
+        {
+            "applicant_id": 401787,
+            "predicted_probability": 0.2639411687850952,
+            "decision_threshold": 0.2,
+            "decision": "DECLINE",
+            "top_risk_increasing_factors": [
+                {
+                    "feature": "EXT_SOURCE_2",
+                    "value": -0.4176315757193488,
+                    "shap_value": 0.35040321946144104,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "previous_refused_count",
+                    "value": -0.34090261932297083,
+                    "shap_value": 0.09040533006191254,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "OWN_CAR_AGE",
+                    "value": -0.03981799978185777,
+                    "shap_value": 0.05556003004312515,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "DAYS_ID_PUBLISH",
+                    "value": -0.21019944923530995,
+                    "shap_value": 0.05295981094241142,
+                    "direction": "increases_risk"
+                },
+                {
+                    "feature": "credit_card_avg_balance",
+                    "value": -0.437006127436218,
+                    "shap_value": 0.051649320870637894,
+                    "direction": "increases_risk"
+                }
+            ],
+            "top_risk_reducing_factors": [
+                {
+                    "feature": "EXT_SOURCE_3",
+                    "value": 0.6088523310818297,
+                    "shap_value": -0.4918052852153778,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "ANNUITY_TO_CREDIT",
+                    "value": 0.5250184445960164,
+                    "shap_value": -0.22962738573551178,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "bureau_balance_avg_months_per_credit",
+                    "value": 0.4193650944117911,
+                    "shap_value": -0.1902017891407013,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "AMT_ANNUITY",
+                    "value": 0.21376463587209835,
+                    "shap_value": -0.12441524118185043,
+                    "direction": "decreases_risk"
+                },
+                {
+                    "feature": "CODE_GENDER",
+                    "value": 0.1803962952418776,
+                    "shap_value": -0.1211901307106018,
+                    "direction": "decreases_risk"
+                }
+            ]
+        }
+    ]
+}
