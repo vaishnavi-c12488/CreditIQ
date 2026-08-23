@@ -11,6 +11,36 @@ The main idea behind CreditIQ is simple:
 > **A useful ML system should not only make predictions. It should also explain them, evaluate their reliability, consider fairness, and be deployable.**
 
 ---
+## Final Model at a Glance
+
+| Component | Final Choice |
+|---|---|
+| **Model** | Monotonic XGBoost |
+| **Base Algorithm** | XGBoost Gradient Boosted Trees |
+| **Model Features** | 80 |
+| **Training Dataset** | 307,511 applicants |
+| **Calibration** | Platt Scaling |
+| **Decision Threshold** | 0.20 |
+| **Explainability** | SHAP TreeExplainer |
+| **Fairness Evaluation** | Fairlearn |
+| **Model Tracking** | MLflow |
+| **Deployment** | FastAPI + Docker |
+| **Database** | PostgreSQL |
+
+### Final Test Performance
+
+| Metric | Score |
+|---|---:|
+| **ROC-AUC** | **0.7630** |
+| **PR-AUC** | **0.2826** |
+| **KS Statistic** | **0.3942** |
+| **Precision** | **31.38%** |
+| **Recall** | **34.17%** |
+| **F1 Score** | **32.71%** |
+| **Calibration Error** | **0.0096** |
+| **False Positive Rate** | **8.44%** |
+
+> The final model is a monotonic XGBoost classifier selected after comparison with Logistic Regression and unconstrained XGBoost. The probability outputs are calibrated using Platt scaling, and a validation-selected threshold of 0.20 is used for the final approval/decline decision.
 
 ## Project Highlights
 
