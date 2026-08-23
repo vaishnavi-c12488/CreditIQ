@@ -33,6 +33,7 @@ The main idea behind CreditIQ is simple:
 |---|---:|
 | **ROC-AUC** | **0.7630** |
 | **PR-AUC** | **0.2826** |
+| **Accuracy** | **91.56%** |
 | **KS Statistic** | **0.3942** |
 | **Precision** | **31.38%** |
 | **Recall** | **34.17%** |
