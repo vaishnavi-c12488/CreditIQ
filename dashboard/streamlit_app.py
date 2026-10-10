@@ -1,626 +1,317 @@
 """
-CreditIQ — Risk Assessment Console
+CreditIQ Underwriting Console
 
-The dashboard is a client of the CreditIQ FastAPI service.
-It does not load the model or access PostgreSQL directly.
+Streamlit client for the CreditIQ FastAPI service. It never touches the model
+or PostgreSQL directly.
 
-Flow:
-    Streamlit
-        ↓
-    FastAPI
-        ↓
-    CreditIQ Model / Feature Store
+    Streamlit -> FastAPI (/health, /score, /explain) -> Model / Feature Store
 """
 
-import math
+import json
+import os
 import textwrap
 
 import requests
 import streamlit as st
 
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-import os
-
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
-COLORS = {
-    "ink": "#10131C",
-    "ink_muted": "#5B6472",
-    "surface": "#FFFFFF",
-    "app_bg": "#F3F5F8",
-    "border": "#E2E5EA",
-    "navy": "#16324F",
-    "navy_dark": "#0F2438",
-    "safe": "#1E7A4C",
-    "safe_bg": "#E7F5EC",
-    "risk": "#B3261E",
-    "risk_bg": "#FBEAEA",
-    "amber": "#B9770E",
+INK, OK, BAD, WARN, TEAL = "#0C1A24", "#0F8A5F", "#C73A3A", "#BE7C0C", "#0B5F6B"
+
+DECISIONS = {
+    "APPROVE": ("Approve", OK),
+    "APPROVED": ("Approve", OK),
+    "DECLINE": ("Decline", BAD),
+    "DECLINED": ("Decline", BAD),
+    "REVIEW": ("Refer to underwriter", WARN),
 }
-
-DECISION_STYLES = {
-    "APPROVE": {"label": "APPROVED", "glyph": "✓", "fg": COLORS["safe"], "bg": COLORS["safe_bg"]},
-    "APPROVED": {"label": "APPROVED", "glyph": "✓", "fg": COLORS["safe"], "bg": COLORS["safe_bg"]},
-    "DECLINE": {"label": "DECLINED", "glyph": "✕", "fg": COLORS["risk"], "bg": COLORS["risk_bg"]},
-    "DECLINED": {"label": "DECLINED", "glyph": "✕", "fg": COLORS["risk"], "bg": COLORS["risk_bg"]},
-    "REVIEW": {"label": "REFER TO REVIEW", "glyph": "!", "fg": COLORS["amber"], "bg": "#FBF2E3"},
-}
-
-
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
 
 st.set_page_config(
-    page_title="CreditIQ — Risk Assessment Console",
-    page_icon="◆",
-    layout="centered",
+    page_title="CreditIQ Underwriting Console",
+    page_icon="◐",
+    layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
-
-# ============================================================
-# HTML RENDER HELPER
-# ------------------------------------------------------------
-# Streamlit's markdown parser treats any line indented 4+ spaces
-# as a literal code block, which silently renders raw HTML/CSS
-# as plain text. textwrap.dedent() strips the common leading
-# whitespace that Python's own indentation otherwise adds to
-# every multi-line f-string, so tags always parse as HTML
-# instead of printing as text. Every HTML/CSS block in this
-# file is routed through this one function.
-# ============================================================
 
 def render_html(content: str) -> None:
-    """
-    Renders raw HTML/CSS safely inside Streamlit.
-
-    Two Markdown quirks otherwise cause tags to print as literal text:
-    1. Any line indented 4+ spaces is treated as a code block —
-       Python's own indentation adds this to every multi-line
-       f-string, so textwrap.dedent() strips the common prefix first.
-    2. A blank line inside the block can end Markdown's "raw HTML"
-       passthrough early, causing whatever follows to be re-parsed
-       as an ordinary (non-HTML) paragraph. Blank lines are dropped
-       entirely so a whole block is always passed through as one
-       uninterrupted chunk of HTML.
-    """
-    dedented = textwrap.dedent(content).strip()
-    collapsed = "\n".join(line for line in dedented.splitlines() if line.strip() != "")
-    st.markdown(collapsed, unsafe_allow_html=True)
+    """Dedent and drop blank lines so Streamlit's Markdown never shows tags as text."""
+    text = textwrap.dedent(content).strip()
+    st.markdown("\n".join(l for l in text.splitlines() if l.strip()), unsafe_allow_html=True)
 
 
-def humanize_feature_name(name: str) -> str:
-    """Turns a raw feature/column name into a readable label."""
-    cleaned = name
+def humanize(name: str) -> str:
     for suffix in ("_woe", "_WOE", "_Woe"):
-        if cleaned.endswith(suffix):
-            cleaned = cleaned[: -len(suffix)]
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
             break
-    return cleaned.replace("_", " ").strip().upper()
+    return name.replace("_", " ").strip().title()
 
 
-# ============================================================
-# GLOBAL STYLE
-# ============================================================
+def call_api(path: str, payload: dict):
+    """Returns (data, error_message)."""
+    try:
+        r = requests.post(f"{API_URL}{path}", json=payload, timeout=15)
+    except requests.RequestException as exc:
+        return None, f"Can't reach the CreditIQ API at {API_URL}. Start the service and try again. ({exc})"
+    if r.status_code == 200:
+        return r.json(), None
+    if r.status_code == 404:
+        return None, f"Applicant {payload['applicant_id']} wasn't found. Check the ID and try again."
+    return None, f"The API returned an error ({r.status_code}): {r.text}"
 
+
+# ------------------------------------------------------------------ styles
 render_html(
-    f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-
-    html, body, [class*="css"] {{
-        font-family: 'IBM Plex Sans', sans-serif;
-        color: {COLORS["ink"]};
-    }}
-
-    .stApp {{
-        background-color: {COLORS["app_bg"]};
-    }}
-
-    #MainMenu, footer, header {{ visibility: hidden; }}
-
-    .block-container {{
-        max-width: 760px;
-        padding-top: 2.25rem;
-        padding-bottom: 3rem;
-    }}
-
-    /* ---------------- Native bordered containers -> cards ---------------- */
-    div[data-testid="stVerticalBlockBorderWrapper"] {{
-        background: {COLORS["surface"]};
-        border: 1px solid {COLORS["border"]} !important;
-        border-radius: 14px !important;
-        box-shadow: 0 1px 2px rgba(16, 19, 28, 0.04);
-        margin-bottom: 22px;
-    }}
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {{
-        padding: 6px 4px;
-    }}
-
-    .card-title {{
-        font-size: 0.76rem;
-        font-weight: 600;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: {COLORS["ink_muted"]};
-        margin: 0 0 18px 0;
-    }}
-
-    /* ---------------- Masthead ---------------- */
-    .ciq-masthead {{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding-bottom: 14px;
-        border-bottom: 1px solid {COLORS["border"]};
-        margin-bottom: 28px;
-    }}
-    .ciq-wordmark {{
-        display: flex;
-        align-items: baseline;
-        gap: 10px;
-    }}
-    .ciq-wordmark .mark {{
-        font-family: 'IBM Plex Mono', monospace;
-        font-weight: 600;
-        font-size: 1.05rem;
-        letter-spacing: 0.02em;
-        color: {COLORS["navy"]};
-        border: 1.5px solid {COLORS["navy"]};
-        border-radius: 6px;
-        padding: 2px 7px;
-    }}
-    .ciq-wordmark .eyebrow {{
-        font-size: 0.72rem;
-        font-weight: 600;
-        letter-spacing: 0.14em;
-        color: {COLORS["ink_muted"]};
-        text-transform: uppercase;
-    }}
-    .status-pill {{
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.72rem;
-        font-weight: 500;
-        letter-spacing: 0.06em;
-        padding: 5px 11px;
-        border-radius: 999px;
-        white-space: nowrap;
-    }}
-    .status-pill .dot {{
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        display: inline-block;
-    }}
-    .status-online {{ background: {COLORS["safe_bg"]}; color: {COLORS["safe"]}; }}
-    .status-online .dot {{ background: {COLORS["safe"]}; }}
-    .status-offline {{ background: {COLORS["risk_bg"]}; color: {COLORS["risk"]}; }}
-    .status-offline .dot {{ background: {COLORS["risk"]}; }}
-    .status-degraded {{ background: #FBF2E3; color: {COLORS["amber"]}; }}
-    .status-degraded .dot {{ background: {COLORS["amber"]}; }}
-
-    /* ---------------- Decision card ---------------- */
-    .decision-badge {{
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
-        font-family: 'IBM Plex Mono', monospace;
-        font-weight: 600;
-        font-size: 1.05rem;
-        letter-spacing: 0.05em;
-        padding: 12px 22px;
-        border-radius: 10px;
-    }}
-    .decision-badge .glyph {{
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: currentColor;
-        font-size: 0.8rem;
-    }}
-    .decision-badge .glyph span {{
-        color: white;
-    }}
-    .threshold-note {{
-        font-size: 0.78rem;
-        color: {COLORS["ink_muted"]};
-        margin-top: 10px;
-        line-height: 1.5;
-    }}
-
-    /* ---------------- Data strip ---------------- */
-    .data-strip {{
-        display: flex;
-        border-top: 1px solid {COLORS["border"]};
-        margin-top: 22px;
-        padding-top: 18px;
-    }}
-    .data-cell {{
-        flex: 1;
-        padding: 0 18px;
-        border-left: 1px solid {COLORS["border"]};
-    }}
-    .data-cell:first-child {{ border-left: none; padding-left: 0; }}
-    .data-cell .label {{
-        font-size: 0.66rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: {COLORS["ink_muted"]};
-        margin-bottom: 5px;
-    }}
-    .data-cell .value {{
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 1.28rem;
-        font-weight: 600;
-        color: {COLORS["ink"]};
-        white-space: nowrap;
-    }}
-
-    /* ---------------- Ledger bars ---------------- */
-    .ledger-column-title {{
-        font-size: 0.78rem;
-        font-weight: 600;
-        margin-bottom: 14px;
-    }}
-    .ledger-row {{
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 13px;
-    }}
-    .ledger-label {{
-        flex: 0 0 40%;
-        font-size: 0.74rem;
-        font-weight: 500;
-        letter-spacing: 0.01em;
-        color: {COLORS["ink"]};
-        line-height: 1.25;
-    }}
-    .ledger-track {{
-        flex: 1;
-        height: 9px;
-        background: {COLORS["app_bg"]};
-        border-radius: 5px;
-        overflow: hidden;
-    }}
-    .ledger-fill {{
-        height: 100%;
-        border-radius: 5px;
-    }}
-    .ledger-value {{
-        flex: 0 0 58px;
-        text-align: right;
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.76rem;
-        color: {COLORS["ink_muted"]};
-    }}
-    .ledger-footnote {{
-        font-size: 0.72rem;
-        color: {COLORS["ink_muted"]};
-        margin-top: 6px;
-        padding-top: 14px;
-        border-top: 1px solid {COLORS["border"]};
-    }}
-
-    /* ---------------- Streamlit control overrides ---------------- */
-    div[data-testid="stNumberInput"] input {{
-        font-family: 'IBM Plex Mono', monospace;
-        border-radius: 8px !important;
-        border: 1px solid {COLORS["border"]} !important;
-    }}
-    .stButton > button {{
-        width: 100%;
-        border-radius: 8px;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        padding: 0.6rem 1.1rem;
-        border: 1px solid {COLORS["navy"]};
-        transition: background 0.15s ease, color 0.15s ease;
-    }}
-    .stButton > button[kind="primary"] {{
-        background: {COLORS["navy"]};
-        color: #FFFFFF;
-    }}
-    .stButton > button[kind="primary"]:hover {{
-        background: {COLORS["navy_dark"]};
-        border-color: {COLORS["navy_dark"]};
-        color: #FFFFFF;
-    }}
-    .stButton > button[kind="secondary"] {{
-        background: transparent;
-        color: {COLORS["navy"]};
-    }}
-    .stButton > button[kind="secondary"]:hover {{
-        background: {COLORS["app_bg"]};
-        color: {COLORS["navy_dark"]};
-    }}
-    .footnote {{
-        font-size: 0.74rem;
-        color: {COLORS["ink_muted"]};
-        margin-top: 6px;
-    }}
-    </style>
     """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap');
+:root{--ink:#0C1A24;--mist:#EAF0F2;--line:#D5DEE2;--muted:#55666F;--teal:#0B5F6B;--deep:#072B36;--ok:#0F8A5F;--bad:#C73A3A;--warn:#BE7C0C;}
+html,body,[class*="css"]{font-family:'Figtree',sans-serif;color:var(--ink);}
+.stApp{background:var(--mist);}
+#MainMenu,footer,header{visibility:hidden;}
+.block-container{max-width:1360px;padding:1.25rem 3vw 3rem;}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-radius:22px;padding:28px 40px 56px;color:#fff;
+  background:linear-gradient(120deg,var(--deep) 0%,var(--teal) 100%);margin-bottom:18px;}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:16px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,transparent 1px 24px);}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:44px;}
+.brand{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.35rem;letter-spacing:-.01em;}
+.brand i{font-style:normal;opacity:.65;font-weight:600;margin-left:8px;font-size:1rem;}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:.82rem;font-weight:600;background:rgba(255,255,255,.14);}
+.pill b{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.hero h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:clamp(2rem,4.2vw,3.6rem);line-height:1.04;letter-spacing:-.025em;margin:0 0 14px;max-width:16ch;color:#fff;}
+.hero p{max-width:58ch;font-size:1.05rem;line-height:1.55;opacity:.86;margin:0;}
+
+/* containers */
+div[data-testid="stVerticalBlockBorderWrapper"]{background:#fff;border:1px solid var(--line)!important;border-radius:18px!important;box-shadow:0 1px 2px rgba(12,26,36,.04);}
+div[data-testid="stForm"]{border:none;padding:0;}
+div[data-testid="stNumberInput"] input{font-size:1.15rem;font-weight:600;border-radius:12px!important;}
+.stButton>button,.stDownloadButton>button,div[data-testid="stFormSubmitButton"]>button{border-radius:12px;font-weight:700;padding:.65rem 1.2rem;border:1.5px solid var(--teal);}
+div[data-testid="stFormSubmitButton"]>button[kind="primaryFormSubmit"],.stButton>button[kind="primary"]{background:var(--teal);color:#fff;}
+div[data-testid="stFormSubmitButton"]>button:hover{background:var(--deep);border-color:var(--deep);color:#fff;}
+
+/* verdict */
+.sec{font-family:'Bricolage Grotesque',sans-serif;font-weight:600;font-size:1.05rem;margin:0 0 4px;}
+.sub{color:var(--muted);font-size:.9rem;margin:0 0 16px;line-height:1.5;}
+.verdict{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:clamp(2.2rem,4vw,3.4rem);letter-spacing:-.025em;line-height:1;margin:2px 0 8px;}
+.stats{display:flex;border-top:1px solid var(--line);margin-top:6px;padding-top:16px;}
+.stat{flex:1;padding:0 18px;border-left:1px solid var(--line);}
+.stat:first-child{border-left:none;padding-left:0;}
+.stat span{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px;}
+.stat b{font-family:'Bricolage Grotesque',sans-serif;font-size:1.45rem;font-weight:800;}
+.note{font-size:.85rem;color:var(--muted);line-height:1.5;margin-top:10px;}
+.sim{border-radius:12px;background:var(--mist);padding:12px 16px;font-size:.92rem;font-weight:500;margin-top:6px;}
+
+/* risk spectrum */
+.spec{position:relative;height:150px;margin:34px 10px 4px;}
+.spec-track{position:absolute;top:52px;left:0;right:0;height:16px;border-radius:8px;background:linear-gradient(90deg,#F2CFCA,#E59A92);}
+.spec-ok{position:absolute;left:0;top:0;bottom:0;border-radius:8px 0 0 8px;background:linear-gradient(90deg,#C4EAD8,#7CCBA8);}
+.cut{position:absolute;top:30px;height:60px;border-left:2px solid var(--ink);}
+.cut.test{top:4px;height:86px;border-left:2px dashed var(--teal);}
+.cut span{position:absolute;bottom:100%;left:0;transform:translateX(-50%);padding-bottom:3px;font-size:.78rem;font-weight:700;white-space:nowrap;}
+.cut.test span{color:var(--teal);}
+.pin{position:absolute;top:44px;width:32px;height:32px;margin-left:-16px;border-radius:50%;background:var(--c);border:4px solid #fff;
+  box-shadow:0 2px 10px rgba(12,26,36,.35);animation:slideIn 1.1s cubic-bezier(.2,.8,.2,1);}
+.pin b{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;font-family:'Bricolage Grotesque',sans-serif;font-size:1.05rem;color:var(--c);white-space:nowrap;}
+.ticks{position:absolute;top:124px;left:0;right:0;}
+.ticks span{position:absolute;transform:translateX(-50%);font-size:.74rem;color:var(--muted);}
+@keyframes slideIn{from{left:0;}}
+@media (prefers-reduced-motion:reduce){.pin{animation:none;}}
+
+/* drivers */
+.drv-head{display:flex;justify-content:space-between;font-size:.8rem;font-weight:700;margin:2px 0 14px;}
+.drv-head span:first-child{color:var(--ok);} .drv-head span:last-child{color:var(--bad);}
+.drv{display:grid;grid-template-columns:38% 1fr 62px;gap:12px;align-items:center;margin-bottom:14px;}
+.drv-name{font-size:.88rem;font-weight:600;line-height:1.25;}
+.drv-bar{position:relative;height:12px;background:var(--mist);border-radius:6px;}
+.drv-bar::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:#9AA9B1;}
+.drv-bar i{position:absolute;top:0;bottom:0;}
+.drv-bar i.up{left:50%;background:var(--bad);border-radius:0 6px 6px 0;}
+.drv-bar i.down{right:50%;background:var(--ok);border-radius:6px 0 0 6px;}
+.drv-val{text-align:right;font-size:.82rem;font-weight:600;color:var(--muted);}
+.empty{text-align:center;padding:44px 12px;color:var(--muted);font-size:1rem;}
+.empty b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:1.4rem;color:var(--ink);margin-bottom:6px;}
+</style>
+"""
 )
 
 
-# ============================================================
-# GAUGE
-# ============================================================
-
-def render_gauge(probability: float, threshold: float) -> str:
-    """
-    Builds an inline SVG semicircular risk gauge.
-    Safe zone spans [0, threshold], risk zone spans [threshold, 1].
-    A tick marks the exact decision threshold; a needle marks the
-    applicant's calibrated probability of default.
-    """
-    probability = min(max(probability, 0.0), 1.0)
-    threshold = min(max(threshold, 0.0), 1.0)
-
-    cx, cy, r = 110, 106, 82
-
-    def point(fraction: float, radius: float) -> tuple:
-        angle = math.pi * (1 - fraction)  # 0 -> 180deg (left), 1 -> 0deg (right)
-        return (
-            cx + radius * math.cos(angle),
-            cy - radius * math.sin(angle),
-        )
-
-    def arc_path(f_start: float, f_end: float, radius: float) -> str:
-        x1, y1 = point(f_start, radius)
-        x2, y2 = point(f_end, radius)
-        return f"M {x1:.2f} {y1:.2f} A {radius} {radius} 0 0 1 {x2:.2f} {y2:.2f}"
-
-    safe_path = arc_path(0.0, threshold, r)
-    risk_path = arc_path(threshold, 1.0, r)
-
-    tick_inner = point(threshold, r - 13)
-    tick_outer = point(threshold, r + 7)
-
-    needle_tip = point(probability, r - 20)
-    needle_color = COLORS["risk"] if probability >= threshold else COLORS["navy"]
-
+# --------------------------------------------------------------- components
+def spectrum_html(p: float, thr: float, test: float, color: str) -> str:
+    vmax = min(1.0, max(0.5, max(p, thr, test) * 1.3))
+    pos = lambda v: min(max(v / vmax, 0.0), 1.0) * 100
+    test_cut = ""
+    if abs(test - thr) > 1e-9:
+        test_cut = f'<div class="cut test" style="left:{pos(test):.2f}%"><span>Test cutoff {test:.0%}</span></div>'
+    ticks = "".join(f'<span style="left:{i * 25}%">{vmax * i / 4:.0%}</span>' for i in range(5))
     return f"""
-    <svg viewBox="0 0 220 126" width="100%" height="150" role="img" aria-label="Risk gauge">
-        <path d="{safe_path}" fill="none" stroke="{COLORS['safe']}" stroke-width="13" opacity="0.55" />
-        <path d="{risk_path}" fill="none" stroke="{COLORS['risk']}" stroke-width="13" opacity="0.45" />
-        <line x1="{tick_inner[0]:.2f}" y1="{tick_inner[1]:.2f}" x2="{tick_outer[0]:.2f}" y2="{tick_outer[1]:.2f}"
-              stroke="{COLORS['ink']}" stroke-width="2.5" />
-        <circle cx="{cx}" cy="{cy}" r="5" fill="{COLORS['ink']}" />
-        <line x1="{cx}" y1="{cy}" x2="{needle_tip[0]:.2f}" y2="{needle_tip[1]:.2f}"
-              stroke="{needle_color}" stroke-width="3.5" stroke-linecap="round" />
-        <text x="{cx}" y="{cy + 32}" text-anchor="middle" font-family="IBM Plex Mono, monospace"
-              font-size="21" font-weight="600" fill="{COLORS['ink']}">{probability:.2%}</text>
-        <text x="{cx}" y="{cy + 48}" text-anchor="middle" font-family="IBM Plex Sans, sans-serif"
-              font-size="9" letter-spacing="1.3" fill="{COLORS['ink_muted']}">PROBABILITY OF DEFAULT</text>
-    </svg>
+    <div class="spec">
+      <div class="spec-track"><div class="spec-ok" style="width:{pos(thr):.2f}%"></div></div>
+      <div class="cut" style="left:{pos(thr):.2f}%"><span>Approved cutoff {thr:.0%}</span></div>
+      {test_cut}
+      <div class="pin" style="left:{pos(p):.2f}%;--c:{color}"><b>{p:.1%}</b></div>
+      <div class="ticks">{ticks}</div>
+    </div>
     """
 
 
-def render_ledger_bars(factors: list, max_value: float, fill_color: str) -> str:
-    if not factors:
-        return "<div class='footnote'>No contributing factors returned.</div>"
-
+def drivers_html(risk: list, protective: list) -> str:
+    items = [(f, 1) for f in risk] + [(f, -1) for f in protective]
+    if not items:
+        return '<div class="note">The API returned no contributing factors for this applicant.</div>'
+    items.sort(key=lambda it: -abs(it[0].get("contribution", 0)))
+    top = max(abs(f.get("contribution", 0)) for f, _ in items) or 1.0
     rows = ""
-    for factor in factors:
-        magnitude = abs(factor.get("contribution", 0))
-        width_pct = 6 if max_value == 0 else max(6, (magnitude / max_value) * 100)
-        label = humanize_feature_name(str(factor.get("feature", "—")))
+    for f, side in items:
+        c = abs(f.get("contribution", 0))
+        width = max(c / top * 50, 2)
+        cls = "up" if side > 0 else "down"
+        sign = "+" if side > 0 else "−"
         rows += (
-            '<div class="ledger-row">'
-            f'<div class="ledger-label">{label}</div>'
-            f'<div class="ledger-track"><div class="ledger-fill" '
-            f'style="width:{width_pct:.0f}%; background:{fill_color};"></div></div>'
-            f'<div class="ledger-value">{factor.get("contribution", 0):.3f}</div>'
-            "</div>"
+            f'<div class="drv"><div class="drv-name">{humanize(str(f.get("feature", "Unknown")))}</div>'
+            f'<div class="drv-bar"><i class="{cls}" style="width:{width:.1f}%"></i></div>'
+            f'<div class="drv-val">{sign}{c:.3f}</div></div>'
         )
-    return rows
+    return f'<div class="drv-head"><span>← Lowers risk</span><span>Raises risk →</span></div>{rows}'
 
 
-# ============================================================
-# MASTHEAD
-# ============================================================
+# ------------------------------------------------------------------- state
+st.session_state.setdefault("history", [])
+st.session_state.setdefault("sim_cutoff", 20)
 
-status_html = '<span class="status-pill status-offline"><span class="dot"></span>SYSTEM OFFLINE</span>'
-
+# ------------------------------------------------------------------- hero
+dot, status = "#F2B544", "Checking API"
 try:
-    health_response = requests.get(f"{API_URL}/health", timeout=5)
-
-    if health_response.status_code == 200:
-        health_data = health_response.json()
-
-        if health_data.get("model_loaded") and health_data.get("database_connected"):
-            status_html = '<span class="status-pill status-online"><span class="dot"></span>SYSTEM ONLINE</span>'
-        else:
-            status_html = '<span class="status-pill status-degraded"><span class="dot"></span>DEPENDENCY DEGRADED</span>'
+    h = requests.get(f"{API_URL}/health", timeout=3)
+    if h.status_code == 200:
+        d = h.json()
+        ready = d.get("model_loaded") and d.get("database_connected")
+        dot, status = ("#4ADE9B", "Model and database ready") if ready else ("#F2B544", "A dependency is degraded")
     else:
-        status_html = '<span class="status-pill status-degraded"><span class="dot"></span>UNEXPECTED STATUS</span>'
-
+        dot, status = "#F2B544", f"API returned {h.status_code}"
 except requests.RequestException:
-    status_html = '<span class="status-pill status-offline"><span class="dot"></span>API UNREACHABLE</span>'
+    dot, status = "#FF7B72", "API unreachable"
 
 render_html(
     f"""
-    <div class="ciq-masthead">
-        <div class="ciq-wordmark">
-            <span class="mark">CR·IQ</span>
-            <span class="eyebrow">Risk Assessment Console</span>
-        </div>
-        {status_html}
+    <div class="hero">
+      <div class="nav">
+        <div class="brand">CreditIQ<i>Underwriting console</i></div>
+        <div class="pill"><b style="background:{dot}"></b>{status}</div>
+      </div>
+      <h1>Know the risk before you lend.</h1>
+      <p>Enter an applicant ID to see the calibrated probability of default, the decision at the approved cutoff,
+      and the factors that moved the score.</p>
     </div>
     """
 )
 
-if "API UNREACHABLE" in status_html:
-    render_html(
-        "<div class='footnote'>Can't reach the CreditIQ API. "
-        "Confirm the service is running on port 8000.</div>"
-    )
-
-
-# ============================================================
-# APPLICANT LOOKUP
-# ============================================================
-
+# ------------------------------------------------------------------ lookup
 with st.container(border=True):
-    render_html('<div class="card-title">Applicant Lookup</div>')
+    with st.form("lookup", border=False):
+        c_in, c_btn = st.columns([4, 1.2], vertical_alignment="bottom")
+        applicant_id = c_in.number_input("Applicant ID", min_value=1, step=1, value=447009)
+        submitted = c_btn.form_submit_button("Assess applicant", type="primary", use_container_width=True)
 
-    col_input, col_button = st.columns([3, 1.4])
+if submitted:
+    aid = int(applicant_id)
+    with st.spinner("Scoring applicant..."):
+        score, err = call_api("/score", {"applicant_id": aid})
+        explain, _ = call_api("/explain", {"applicant_id": aid}) if not err else (None, None)
+    if err:
+        st.session_state.pop("result", None)
+        st.error(err)
+    else:
+        st.session_state["result"] = {"id": aid, "score": score, "explain": explain or {}}
+        st.session_state["sim_cutoff"] = int(min(60, max(1, round(score["threshold"] * 100))))
+        label = DECISIONS.get(str(score["decision"]).upper(), (str(score["decision"]), INK))[0]
+        entry = {
+            "Applicant": aid,
+            "Default probability": f"{score['probability_of_default']:.2%}",
+            "Decision": label,
+        }
+        if not st.session_state["history"] or st.session_state["history"][-1] != entry:
+            st.session_state["history"].append(entry)
 
-    with col_input:
-        applicant_id = st.number_input(
-            "Applicant ID",
-            min_value=1,
-            step=1,
-            value=447009,
-            label_visibility="collapsed",
-        )
+# ----------------------------------------------------------------- results
+res = st.session_state.get("result")
 
-    with col_button:
-        score_clicked = st.button("Assess Applicant →", type="primary", use_container_width=True)
-
-if score_clicked:
-    try:
-        response = requests.post(
-            f"{API_URL}/score",
-            json={"applicant_id": int(applicant_id)},
-            timeout=10,
-        )
-
-        if response.status_code == 200:
-            st.session_state["score_result"] = response.json()
-            st.session_state.pop("explanation", None)
-        elif response.status_code == 404:
-            st.error(f"Applicant {applicant_id} was not found. Check the ID and try again.")
-            st.session_state.pop("score_result", None)
-        else:
-            st.error(f"Scoring failed: {response.text}")
-
-    except requests.RequestException as error:
-        st.error(f"Can't reach the CreditIQ API: {error}")
-
-
-# ============================================================
-# DECISION CARD
-# ============================================================
-
-if "score_result" in st.session_state:
-
-    result = st.session_state["score_result"]
-    probability = result["probability_of_default"]
-    threshold = result["threshold"]
-    decision_key = str(result["decision"]).upper()
-    style = DECISION_STYLES.get(
-        decision_key,
-        {"label": decision_key, "glyph": "•", "fg": COLORS["ink_muted"], "bg": COLORS["app_bg"]},
-    )
-
+if not res:
     with st.container(border=True):
-        render_html(f'<div class="card-title">Credit Decision — Applicant {int(applicant_id)}</div>')
+        render_html(
+            '<div class="empty"><b>No applicant assessed yet</b>'
+            "Enter an ID above and select Assess applicant to see a decision.</div>"
+        )
+else:
+    score, explain = res["score"], res["explain"]
+    p, thr = score["probability_of_default"], score["threshold"]
+    label, color = DECISIONS.get(str(score["decision"]).upper(), (str(score["decision"]), INK))
+    test = st.session_state["sim_cutoff"] / 100
 
-        col_gauge, col_verdict = st.columns([1, 1.1])
+    left, right = st.columns([1.45, 1], gap="medium")
 
-        with col_gauge:
-            render_html(render_gauge(probability, threshold))
-
-        with col_verdict:
+    with left:
+        with st.container(border=True):
+            render_html(f'<div class="sec">Applicant {res["id"]}</div>')
             render_html(
                 f"""
-                <div class="decision-badge" style="color:{style['fg']}; background:{style['bg']};">
-                    <span class="glyph"><span>{style['glyph']}</span></span>{style['label']}
-                </div>
-                <div class="threshold-note">
-                    Decision reflects a frozen threshold of {threshold:.2%},
-                    selected on validation data prior to deployment.
+                <div class="verdict" style="color:{color}">{label}</div>
+                <div class="sub">Probability of default is {p:.1%}, {"below" if p < thr else "at or above"}
+                the {thr:.0%} cutoff set before deployment.</div>
+                """
+            )
+            render_html(spectrum_html(p, thr, test, color))
+            render_html(
+                f"""
+                <div class="stats">
+                  <div class="stat"><span>Probability of default</span><b>{p:.2%}</b></div>
+                  <div class="stat"><span>Approved cutoff</span><b>{thr:.2%}</b></div>
+                  <div class="stat"><span>Model version</span><b style="font-size:1.05rem">{score["model_version"]}</b></div>
                 </div>
                 """
             )
 
-        render_html(
-            f"""
-            <div class="data-strip">
-                <div class="data-cell">
-                    <div class="label">Probability of Default</div>
-                    <div class="value">{probability:.2%}</div>
-                </div>
-                <div class="data-cell">
-                    <div class="label">Decision Threshold</div>
-                    <div class="value">{threshold:.2%}</div>
-                </div>
-                <div class="data-cell">
-                    <div class="label">Model Version</div>
-                    <div class="value" style="font-size:0.98rem;">{result['model_version']}</div>
-                </div>
-            </div>
-            """
-        )
-
-    explain_clicked = st.button("Explain This Decision")
-
-    if explain_clicked:
-        try:
-            response = requests.post(
-                f"{API_URL}/explain",
-                json={"applicant_id": int(applicant_id)},
-                timeout=10,
+        with st.container(border=True):
+            render_html(
+                '<div class="sec">Try a different cutoff</div>'
+                '<div class="sub">Drag to see how a stricter or looser policy would treat this applicant.</div>'
             )
-
-            if response.status_code == 200:
-                st.session_state["explanation"] = response.json()
+            st.slider("Test cutoff (%)", 1, 60, key="sim_cutoff", label_visibility="collapsed")
+            test = st.session_state["sim_cutoff"] / 100
+            outcome = "declined" if p >= test else "approved"
+            if abs(test - thr) < 1e-9:
+                msg = f"This matches the deployed policy. The applicant is {outcome}."
             else:
-                st.error(f"Explanation failed: {response.text}")
+                msg = f"At a {test:.0%} cutoff, this applicant would be {outcome}."
+            render_html(f'<div class="sim">{msg}</div>')
+            render_html(
+                f'<div class="note">This is a what-if only. The decision above always uses the frozen {thr:.0%} cutoff.</div>'
+            )
 
-        except requests.RequestException as error:
-            st.error(f"Can't reach the CreditIQ API: {error}")
+    with right:
+        with st.container(border=True):
+            render_html(
+                '<div class="sec">What drove this score</div>'
+                '<div class="sub">Each bar is a SHAP contribution to the model output.</div>'
+            )
+            render_html(
+                drivers_html(explain.get("top_risk_factors", []), explain.get("top_protective_factors", []))
+            )
+            if not explain:
+                st.warning("The explanation request failed, so factors aren't shown. Assess the applicant again to retry.")
+            st.download_button(
+                "Download report (JSON)",
+                data=json.dumps({"applicant_id": res["id"], "score": score, "explanation": explain}, indent=2),
+                file_name=f"creditiq_{res['id']}.json",
+                mime="application/json",
+                use_container_width=True,
+            )
 
-
-# ============================================================
-# EXPLANATION — RISK LEDGER
-# ============================================================
-
-if "explanation" in st.session_state:
-
-    explanation = st.session_state["explanation"]
-    risk_factors = explanation.get("top_risk_factors", [])
-    protective_factors = explanation.get("top_protective_factors", [])
-
-    all_magnitudes = [abs(f.get("contribution", 0)) for f in risk_factors + protective_factors]
-    max_magnitude = max(all_magnitudes) if all_magnitudes else 0
-
+# ----------------------------------------------------------------- history
+if st.session_state["history"]:
     with st.container(border=True):
-        render_html('<div class="card-title">Risk Ledger</div>')
-
-        col_risk, col_protect = st.columns(2)
-
-        with col_risk:
-            render_html(
-                f'<div class="ledger-column-title" style="color:{COLORS["risk"]};">↑ Increases Risk</div>'
-                + render_ledger_bars(risk_factors, max_magnitude, COLORS["risk"])
-            )
-
-        with col_protect:
-            render_html(
-                f'<div class="ledger-column-title" style="color:{COLORS["safe"]};">↓ Reduces Risk</div>'
-                + render_ledger_bars(protective_factors, max_magnitude, COLORS["safe"])
-            )
-
-        render_html(
-            f"""
-            <div class="ledger-footnote">
-                Model: {explanation.get('model_version', '—')} ·
-                Contributions are SHAP values on the underlying model output.
-            </div>
-            """
-        )
+        render_html('<div class="sec">Recent assessments</div><div class="sub">This session, newest first.</div>')
+        st.dataframe(list(reversed(st.session_state["history"]))[:8], hide_index=True, use_container_width=True)
