@@ -23,6 +23,8 @@ CreditIQ is designed as a production-oriented ML system with:
 
 The system provides not only a credit decision, but also an explanation of **why** that decision was made, making the model more transparent, auditable, and suitable for responsible credit-risk applications.
 
+---
+
 ## Final Model at a Glance
 
 | Component | Final Choice |
@@ -42,6 +44,8 @@ The system provides not only a credit decision, but also an explanation of **why
 | Containerization | Docker |
 | CI/CD | GitHub Actions |
 | Cloud Deployment | Render |
+
+---
 
 ## Final Test Performance
 
@@ -74,6 +78,8 @@ Credit-risk prediction is an imbalanced classification problem, so accuracy alon
 
 The final model was selected after comparing multiple modeling approaches and considering not only predictive performance, but also calibration, explainability, and monotonic behavior.
 
+---
+
 ## Project Highlights
 
 | Value | What It Represents |
@@ -92,11 +98,13 @@ The final model was selected after comparing multiple modeling approaches and co
 | **PostgreSQL** | Production feature store |
 | **Render** | Cloud deployment platform |
 
-# Architecture
+---
+
+## Architecture
 
 CreditIQ follows an end-to-end production-oriented ML architecture that connects data engineering, feature engineering, model development, explainability, API serving, database storage, CI, and cloud deployment.
 
-## System Architecture
+### System Architecture
 
 ```text
                          Home Credit Dataset
@@ -110,7 +118,7 @@ CreditIQ follows an end-to-end production-oriented ML architecture that connects
                                  ▼
                         ┌──────────────────┐
                         │ Feature          │
-                        │ Engineering     │
+                        │ Engineering      │
                         └────────┬─────────┘
                                  │
                                  ▼
@@ -165,12 +173,11 @@ CreditIQ follows an end-to-end production-oriented ML architecture that connects
                                               │
                                               ▼
                                          Render Cloud
+```
 
+### Production Deployment Architecture
 
-
-# Production Deployment Architecture
-
-
+```text
                            GitHub
                               │
                               ▼
@@ -194,9 +201,11 @@ CreditIQ follows an end-to-end production-oriented ML architecture that connects
                            ▼                     ▼
                      Prediction              SHAP
                      + Decision           Explanation
+```
 
+---
 
-# 🌐 Live Deployment
+## 🌐 Live Deployment
 
 CreditIQ has been deployed as a complete cloud-based ML application using Render.
 
@@ -210,16 +219,19 @@ FastAPI Model API
         │
         ▼
 PostgreSQL Feature Store
+```
 
-# Model Development & Comparison
+Live links are listed in the [Live Links](#live-links) section below.
+
+---
+
+## Model Development & Comparison
 
 CreditIQ was developed as a supervised binary classification problem using the Home Credit dataset.
 
 The modeling workflow focused on predictive performance, probability quality, explainability, and responsible decision-making rather than optimizing accuracy alone.
 
-## Models Evaluated
-
-Several models were evaluated during development:
+### Models Evaluated
 
 | Model | Purpose |
 |---|---|
@@ -230,24 +242,24 @@ Several models were evaluated during development:
 
 The final model was selected based on the overall validation results and its suitability for a credit-risk decision-support system.
 
-## Final Model
-
-The production model is:
+### Final Model
 
 ```text
 Model:              Monotonic XGBoost
 Model Version:      xgboost_monotonic_v1
 Number of Features: 80
 Decision Threshold: 0.20
+```
 
+---
 
-# Probability Calibration & Decision Threshold
+## Probability Calibration & Decision Threshold
 
 Raw model scores were calibrated before being used as production probabilities.
 
 CreditIQ uses **Platt Scaling** to improve the reliability of predicted default probabilities. This is important in credit-risk applications because the output is interpreted as a probability of default rather than only as a class label.
 
-## Calibration Workflow
+### Calibration Workflow
 
 ```text
 XGBoost Model
@@ -261,14 +273,17 @@ Calibrated Probability of Default
 Frozen Decision Threshold
       ↓
 Credit Decision
+```
 
-# Explainability
+---
+
+## Explainability
 
 CreditIQ uses **SHAP (SHapley Additive exPlanations)** to explain individual credit-risk predictions.
 
 Instead of returning only a probability and decision, the system identifies the features that contributed most to increasing or reducing the applicant's predicted risk.
 
-## Applicant-Level Explanation
+### Applicant-Level Explanation
 
 The `/explain` API endpoint returns:
 
@@ -294,14 +309,17 @@ The explanation separates the factors into two groups:
                   /           \
                  ▼             ▼
         Increases Risk    Reduces Risk
+```
 
-# Fairness & Responsible ML
+---
+
+## Fairness & Responsible ML
 
 CreditIQ treats credit-risk prediction as a high-impact machine learning application where predictive performance alone is not sufficient.
 
 The system includes a fairness evaluation layer to identify potential differences in model behavior across protected-attribute proxies.
 
-## Fairness Evaluation
+### Fairness Evaluation
 
 The fairness audit evaluates:
 
@@ -313,7 +331,7 @@ The fairness audit evaluates:
 
 These results are stored in the PostgreSQL `fairness_audit_results` table for traceability.
 
-## Fairness Audit Flow
+### Fairness Audit Flow
 
 ```text
 Production Model
@@ -322,36 +340,40 @@ Protected-Attribute Proxy
        ↓
 Fairness Evaluation
        ↓
-┌─────────────────────────────┐
+┌──────────────────────────────┐
 │ Demographic Parity Difference│
 │ Equalized Odds Difference    │
-└──────────────┬──────────────┘
+└──────────────┬───────────────┘
                ↓
         Audit Result
                ↓
           PostgreSQL
+```
 
-# Data & Database
+---
+
+## Data & Database
 
 CreditIQ uses the Home Credit dataset as its primary source for applicant-level credit-risk modeling.
 
 The raw data is transformed through data preparation and feature engineering before being stored as model-ready applicant features in PostgreSQL.
 
-## Dataset
-
-The modeling dataset contains:
+### Dataset
 
 ```text
 307,511 applicants
 80 production model features
+```
 
-# API & Model Serving
+---
+
+## API & Model Serving
 
 CreditIQ exposes the production machine learning model through a FastAPI REST API.
 
 The API separates the model inference layer from the user interface, allowing the same prediction service to be accessed by the Streamlit dashboard or external applications.
 
-## API Architecture
+### API Architecture
 
 ```text
 Client / Dashboard
@@ -371,14 +393,17 @@ Probability of Default
 Decision Threshold
         ↓
 Response
+```
 
-# Streamlit Dashboard
+---
 
-CreditIQ includes an interactive Streamlit dashboard that provides a simple interface for applicant-level credit-risk assessment.
+## Streamlit Dashboard
 
-The dashboard communicates with the deployed FastAPI service rather than running the model directly in the browser.
+CreditIQ includes an interactive, full-width Streamlit dashboard for applicant-level credit-risk assessment.
 
-## Dashboard Flow
+The dashboard communicates with the deployed FastAPI service rather than running the model directly in the browser. It shows the probability of default on a risk spectrum, the decision at the approved cutoff, a factor chart of what drove the score, a what-if cutoff slider, a session history of recent assessments, and a downloadable JSON report.
+
+### Dashboard Flow
 
 ```text
 User
@@ -397,15 +422,18 @@ Probability + Decision
   ↓
 SHAP Explanation
   ↓
-Risk Ledger
+Risk Spectrum + Factor Chart
+```
 
-# Docker & Containerization
+---
+
+## Docker & Containerization
 
 CreditIQ is containerized using Docker to make the application reproducible across development and deployment environments.
 
 The project separates the API and dashboard into independent Docker images while using Docker Compose for local orchestration.
 
-## Docker Services
+### Docker Services
 
 ```text
 Docker Compose
@@ -417,14 +445,17 @@ Docker Compose
       ├── Streamlit Dashboard
       │
       └── MLflow
+```
 
-# CI/CD — GitHub Actions
+---
+
+## CI/CD — GitHub Actions
 
 CreditIQ uses GitHub Actions to automatically validate changes before they are considered ready for deployment.
 
 The CI pipeline helps ensure that application tests pass and that the production Docker images can be built successfully.
 
-## CI Pipeline
+### CI Pipeline
 
 ```text
 Git Push / Pull Request
@@ -442,14 +473,17 @@ Git Push / Pull Request
 Build Dashboard Docker Image
           ↓
       CI Complete
+```
 
-# MLflow & Model Tracking
+---
+
+## MLflow & Model Tracking
 
 CreditIQ uses **MLflow** to support experiment tracking and model lifecycle management.
 
 MLflow helps connect model development with the final production model by keeping track of experiments, model versions, and associated evaluation information.
 
-## MLflow Workflow
+### MLflow Workflow
 
 ```text
 Model Experiments
@@ -461,12 +495,15 @@ Model Selection
 Model Version
         ↓
 Production Deployment
+```
 
-# Production Validation
+---
+
+## Production Validation
 
 CreditIQ was validated after deployment by testing the complete production workflow from the public dashboard and API through the production PostgreSQL feature store and machine learning model.
 
-## Production Health Check
+### Production Health Check
 
 The deployed API successfully returned:
 
@@ -477,20 +514,17 @@ The deployed API successfully returned:
   "model_loaded": true,
   "database_connected": true
 }
-
+```
 
 ---
 
-# 1️⃣8️⃣ SECURITY & CONFIGURATION
-
-```markdown
-# Security & Configuration
+## Security & Configuration
 
 CreditIQ keeps environment-specific configuration outside the application source code.
 
 Sensitive values such as database credentials are supplied through environment variables rather than being hard-coded into the application.
 
-## Environment Variables
+### Environment Variables
 
 The project uses configuration variables including:
 
@@ -502,14 +536,11 @@ DB_USER
 DB_PASSWORD
 API_URL
 MLFLOW_TRACKING_URI
-
+```
 
 ---
 
-# 1️⃣9️⃣ PROJECT STRUCTURE
-
-```markdown
-# Project Structure
+## Project Structure
 
 ```text
 CreditIQ/
@@ -597,32 +628,50 @@ CreditIQ/
 ├── requirements.txt
 ├── .env.example
 └── README.md
-
+```
 
 ---
 
-# 2️⃣0️⃣ LOCAL SETUP
+## Local Setup
 
-```markdown
-# Local Setup
-
-## 1. Clone the Repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/vaishnavi-c12488/CreditIQ.git
 cd CreditIQ
+```
 
+### 2. Create a Virtual Environment and Install Dependencies
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+### 3. Configure Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your PostgreSQL credentials and `API_URL`.
+
+### 4. Start the Full Stack
+
+```bash
+docker compose up --build
+```
+
+Then open the API documentation at <http://localhost:8000/docs>.
 
 ---
 
-# 2️⃣1️⃣ TESTING
-
-```markdown
-# Testing
+## Testing
 
 CreditIQ includes automated tests covering important parts of the application and ML pipeline.
 
-## Test Suite
+### Test Suite
 
 The project includes tests for:
 
@@ -636,14 +685,11 @@ Run the complete test suite with:
 
 ```bash
 pytest -q
-
+```
 
 ---
 
-# 2️⃣2️⃣ FUTURE IMPROVEMENTS
-
-```markdown
-# Future Improvements
+## Future Improvements
 
 CreditIQ currently provides the complete foundation for a production-oriented credit-risk system. Future improvements could include:
 
@@ -659,7 +705,9 @@ CreditIQ currently provides the complete foundation for a production-oriented cr
 - Scalable infrastructure for larger workloads
 - Human-in-the-loop review workflows
 
-# Technology Stack
+---
+
+## Technology Stack
 
 | Category | Technology |
 |---|---|
@@ -679,7 +727,9 @@ CreditIQ currently provides the complete foundation for a production-oriented cr
 | API Documentation | Swagger / OpenAPI |
 | Version Control | Git / GitHub |
 
-# Key Takeaways
+---
+
+## Key Takeaways
 
 CreditIQ demonstrates how a machine learning model can be taken from experimentation to a working production application.
 
@@ -709,41 +759,11 @@ Docker
 CI/CD
        +
 Cloud Deployment
+```
 
 ---
 
-# 2️⃣5️⃣ LIVE LINKS
-
-Put this **near the very end, before the Author section**:
-
-```markdown
-# Live Links
-
-| Resource | Link |
-|---|---|
-| 🌐 CreditIQ Dashboard | https://creditiq-dashboard-vygi.onrender.com |
-| ⚡ CreditIQ API | https://creditiq-a2iw.onrender.com |
-| 📚 Swagger API Documentation | https://creditiq-a2iw.onrender.com/docs |
-| 💻 GitHub Repository | https://github.com/vaishnavi-c12488/CreditIQ |
-
-# Author
-
-**Vaishnavi Chavan**
-
-B.Sc. Data Science  
-Symbiosis Skills and Professional University, Pune
-
-Interested in:
-
-- Data Science
-- Machine Learning
-- ML Engineering
-- Explainable AI
-- Production ML Systems
-
----
-
-## ⭐ Project Highlights
+## Production Checklist
 
 ```text
 ✓ 307,511 applicants in production feature store
@@ -771,4 +791,32 @@ Interested in:
 ✓ Production /score validation
 ✓ Production /explain validation
 ✓ End-to-end production testing
+```
 
+---
+
+## Live Links
+
+| Resource | Link |
+|---|---|
+| 🌐 CreditIQ Dashboard | https://creditiq-dashboard-vygi.onrender.com |
+| ⚡ CreditIQ API | https://creditiq-a2iw.onrender.com |
+| 📚 Swagger API Documentation | https://creditiq-a2iw.onrender.com/docs |
+| 💻 GitHub Repository | https://github.com/vaishnavi-c12488/CreditIQ |
+
+---
+
+## Author
+
+**Vaishnavi Chavan**
+
+B.Sc. Data Science
+Symbiosis Skills and Professional University, Pune
+
+Interested in:
+
+- Data Science
+- Machine Learning
+- ML Engineering
+- Explainable AI
+- Production ML Systems
